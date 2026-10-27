@@ -42,6 +42,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -99,6 +100,8 @@ internal class EpisodeNavigatorState {
     var highlightedEpisodeKey by mutableStateOf<String?>(null)
     var goToSheetVisible by mutableStateOf(false)
     var sortSheetVisible by mutableStateOf(false)
+    var filterSheetVisible by mutableStateOf(false)
+    var downloadedOnly by mutableStateOf(false)
 
     private var groupedSource: List<MetaVideo>? = null
     private var groupedCache: Map<Int, List<MetaVideo>> = emptyMap()
@@ -129,9 +132,12 @@ internal fun List<MetaVideo>.filteredAndSortedForNavigator(
     query: String,
     sort: EpisodeSortOrder,
     isWatched: (MetaVideo) -> Boolean,
+    downloadedOnly: Boolean = false,
+    isDownloaded: (MetaVideo) -> Boolean = { false },
 ): List<MetaVideo> {
     val trimmed = query.trim()
-    val filtered = if (trimmed.isEmpty()) this else filter { it.matchesEpisodeQuery(trimmed) }
+    var filtered = if (trimmed.isEmpty()) this else filter { it.matchesEpisodeQuery(trimmed) }
+    if (downloadedOnly) filtered = filtered.filter(isDownloaded)
     return when (sort) {
         EpisodeSortOrder.FirstToLast -> filtered
         EpisodeSortOrder.LastToFirst -> filtered.asReversed()
@@ -190,6 +196,7 @@ internal fun EpisodeNavigatorBar(
     totalCount: Int,
     onSubmitNumber: (Int) -> Unit,
     modifier: Modifier = Modifier,
+    downloadedCount: Int = 0,
 ) {
     val tokens = MaterialTheme.nuvio
     val fieldShape = RoundedCornerShape(14.dp)
@@ -250,6 +257,11 @@ internal fun EpisodeNavigatorBar(
                     )
                 }
             }
+            EpisodeNavigatorFilterChip(
+                active = state.downloadedOnly,
+                contentDescription = stringResource(Res.string.episode_navigator_filter),
+                onClick = { state.filterSheetVisible = true },
+            )
             EpisodeNavigatorChip(
                 text = stringResource(Res.string.episode_navigator_go_to),
                 onClick = { state.goToSheetVisible = true },
@@ -260,16 +272,137 @@ internal fun EpisodeNavigatorBar(
             )
         }
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            val episodeCount = stringResource(Res.string.episode_navigator_count, shownCount, totalCount)
+            val downloadedCountLabel = if (downloadedCount > 0) {
+                stringResource(Res.string.episode_navigator_downloaded_count, downloadedCount)
+            } else {
+                null
+            }
             Text(
-                text = stringResource(Res.string.episode_navigator_count, shownCount, totalCount),
+                text = listOfNotNull(episodeCount, downloadedCountLabel).joinToString(" · "),
                 style = MaterialTheme.typography.labelMedium,
                 color = tokens.colors.textMuted,
                 modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = stringResource(state.sort.labelRes()),
                 style = MaterialTheme.typography.labelMedium,
                 color = tokens.colors.textMuted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+    if (state.filterSheetVisible) {
+        EpisodeDisplayFilterSheet(
+            downloadedOnly = state.downloadedOnly,
+            onSelect = { state.downloadedOnly = it },
+            onDismiss = { state.filterSheetVisible = false },
+        )
+    }
+}
+
+@Composable
+private fun EpisodeNavigatorFilterChip(
+    active: Boolean,
+    contentDescription: String,
+    onClick: () -> Unit,
+) {
+    val tokens = MaterialTheme.nuvio
+    val shape = RoundedCornerShape(14.dp)
+    Box(
+        modifier = Modifier
+            .size(44.dp)
+            .clip(shape)
+            .background(
+                if (active) tokens.colors.accent.copy(alpha = 0.14f)
+                else tokens.colors.surfaceSheet.copy(alpha = 0.6f),
+            )
+            .border(
+                1.dp,
+                if (active) tokens.colors.accent else tokens.colors.borderDefault,
+                shape,
+            )
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = Icons.Default.FilterList,
+            contentDescription = contentDescription,
+            tint = if (active) tokens.colors.accent else tokens.colors.textPrimary,
+            modifier = Modifier.size(20.dp),
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EpisodeDisplayFilterSheet(
+    downloadedOnly: Boolean,
+    onSelect: (Boolean) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
+    val tokens = MaterialTheme.nuvio
+
+    fun dismiss() {
+        scope.launch {
+            dismissNuvioBottomSheet(sheetState = sheetState, onDismiss = onDismiss)
+        }
+    }
+
+    NuvioModalBottomSheet(
+        onDismissRequest = { dismiss() },
+        sheetState = sheetState,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = nuvioSafeBottomPadding(16.dp)),
+        ) {
+            Text(
+                text = stringResource(Res.string.episode_navigator_filter_title),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = tokens.colors.textPrimary,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+            )
+            NuvioBottomSheetActionRow(
+                title = stringResource(Res.string.episode_navigator_filter_all),
+                selected = !downloadedOnly,
+                onClick = {
+                    onSelect(false)
+                    dismiss()
+                },
+                trailingContent = if (!downloadedOnly) {
+                    {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = null,
+                            tint = tokens.colors.accent,
+                        )
+                    }
+                } else null,
+            )
+            NuvioBottomSheetActionRow(
+                title = stringResource(Res.string.episode_navigator_filter_downloaded),
+                selected = downloadedOnly,
+                onClick = {
+                    onSelect(true)
+                    dismiss()
+                },
+                trailingContent = if (downloadedOnly) {
+                    {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = null,
+                            tint = tokens.colors.accent,
+                        )
+                    }
+                } else null,
             )
         }
     }
@@ -298,8 +431,25 @@ private fun EpisodeNavigatorChip(text: String, onClick: () -> Unit) {
 }
 
 @Composable
-internal fun EpisodeNavigatorEmptyState(query: String, onClear: () -> Unit, modifier: Modifier = Modifier) {
+internal fun EpisodeNavigatorEmptyState(
+    query: String,
+    onClear: () -> Unit,
+    modifier: Modifier = Modifier,
+    downloadedOnly: Boolean = false,
+    onClearDownloadedOnly: () -> Unit = onClear,
+) {
     val tokens = MaterialTheme.nuvio
+    val noDownloadedEpisodes = downloadedOnly && query.isBlank()
+    val message = if (noDownloadedEpisodes) {
+        stringResource(Res.string.episode_navigator_no_downloaded)
+    } else {
+        stringResource(Res.string.episode_navigator_no_match, query.trim())
+    }
+    val actionLabel = if (noDownloadedEpisodes) {
+        stringResource(Res.string.episode_navigator_filter_show_all)
+    } else {
+        stringResource(Res.string.episode_navigator_clear_search)
+    }
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -308,12 +458,15 @@ internal fun EpisodeNavigatorEmptyState(query: String, onClear: () -> Unit, modi
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(
-            text = stringResource(Res.string.episode_navigator_no_match, query.trim()),
+            text = message,
             style = MaterialTheme.typography.bodyMedium,
             color = tokens.colors.textMuted,
             textAlign = TextAlign.Center,
         )
-        EpisodeNavigatorChip(text = stringResource(Res.string.episode_navigator_clear_search), onClick = onClear)
+        EpisodeNavigatorChip(
+            text = actionLabel,
+            onClick = if (noDownloadedEpisodes) onClearDownloadedOnly else onClear,
+        )
     }
 }
 
@@ -549,6 +702,7 @@ internal fun LazyListScope.detailEpisodeListItems(
     watchedKeys: Set<String>,
     episodeRatingsVisibility: EpisodeRatingsVisibility,
     blurUnwatchedEpisodes: Boolean,
+    downloadedEpisodeKeys: Set<String>,
     onEpisodeClick: (MetaVideo) -> Unit,
     onEpisodeLongPress: (MetaVideo) -> Unit,
     onSeasonLongPress: (Int) -> Unit,
@@ -563,8 +717,17 @@ internal fun LazyListScope.detailEpisodeListItems(
     val isWatched: (MetaVideo) -> Boolean = { episode ->
         meta.isEpisodeWatchedForNavigator(episode, progressByVideoId, watchedKeys)
     }
+    val isDownloaded: (MetaVideo) -> Boolean = { episode ->
+        episode.isDownloadedEpisode(meta.id, downloadedEpisodeKeys)
+    }
     val query = navigator.query
-    val shown = seasonEpisodes.filteredAndSortedForNavigator(query, navigator.sort, isWatched)
+    val shown = seasonEpisodes.filteredAndSortedForNavigator(
+        query = query,
+        sort = navigator.sort,
+        isWatched = isWatched,
+        downloadedOnly = navigator.downloadedOnly,
+        isDownloaded = isDownloaded,
+    )
     var emitted = 0
 
     item(key = "detail-episodes-header") {
@@ -591,6 +754,7 @@ internal fun LazyListScope.detailEpisodeListItems(
                 navigator = navigator,
                 listState = listState,
                 seasonEpisodes = seasonEpisodes,
+                downloadedEpisodeKeys = downloadedEpisodeKeys,
                 shownCount = shown.size,
                 firstEpisodeIndex = firstEpisodeIndex,
                 isWatched = isWatched,
@@ -605,7 +769,12 @@ internal fun LazyListScope.detailEpisodeListItems(
     if (shown.isEmpty()) {
         item(key = "detail-episodes-empty") {
             EpisodeSectionContainer(horizontalPadding, contentMaxWidth, bottom = 20.dp) {
-                EpisodeNavigatorEmptyState(query = query, onClear = { navigator.query = "" })
+                EpisodeNavigatorEmptyState(
+                    query = query,
+                    onClear = { navigator.query = "" },
+                    downloadedOnly = navigator.downloadedOnly,
+                    onClearDownloadedOnly = { navigator.downloadedOnly = false },
+                )
             }
         }
         emitted += 1
@@ -617,6 +786,7 @@ internal fun LazyListScope.detailEpisodeListItems(
                     episode = episode,
                     progressByVideoId = progressByVideoId,
                     watchedKeys = watchedKeys,
+                    downloadedEpisodeKeys = downloadedEpisodeKeys,
                     episodeRatings = emptyMap(),
                     episodeRatingsVisibility = episodeRatingsVisibility,
                     blurUnwatchedEpisodes = blurUnwatchedEpisodes,
@@ -670,6 +840,7 @@ private fun EpisodeNavigatorStickyBar(
     navigator: EpisodeNavigatorState,
     listState: LazyListState,
     seasonEpisodes: List<MetaVideo>,
+    downloadedEpisodeKeys: Set<String>,
     shownCount: Int,
     firstEpisodeIndex: Int,
     isWatched: (MetaVideo) -> Boolean,
@@ -683,7 +854,7 @@ private fun EpisodeNavigatorStickyBar(
     val scope = rememberCoroutineScope()
 
     var orderInitialized by remember { mutableStateOf(false) }
-    LaunchedEffect(navigator.sort, navigator.query, navigator.selectedSeason) {
+    LaunchedEffect(navigator.sort, navigator.query, navigator.selectedSeason, navigator.downloadedOnly) {
         if (!orderInitialized) {
             orderInitialized = true
             return@LaunchedEffect
@@ -695,19 +866,33 @@ private fun EpisodeNavigatorStickyBar(
         }
     }
 
+    val isDownloaded: (MetaVideo) -> Boolean = { episode ->
+        episode.isDownloadedEpisode(meta.id, downloadedEpisodeKeys)
+    }
     val jumpTo: (MetaVideo) -> Unit = { target ->
         scope.launch {
             val key = target.navigatorKey()
-            if (navigator.query.isNotEmpty() &&
-                seasonEpisodes.filteredAndSortedForNavigator(navigator.query, navigator.sort, isWatched)
-                    .none { it.navigatorKey() == key }
-            ) {
-                navigator.query = ""
+            val visibleBeforeJump = seasonEpisodes.filteredAndSortedForNavigator(
+                query = navigator.query,
+                sort = navigator.sort,
+                isWatched = isWatched,
+                downloadedOnly = navigator.downloadedOnly,
+                isDownloaded = isDownloaded,
+            )
+            if (visibleBeforeJump.none { it.navigatorKey() == key }) {
+                if (navigator.downloadedOnly && !isDownloaded(target)) navigator.downloadedOnly = false
+                if (navigator.query.isNotEmpty()) navigator.query = ""
                 withFrameNanos { }
                 withFrameNanos { }
             }
             val position = seasonEpisodes
-                .filteredAndSortedForNavigator(navigator.query, navigator.sort, isWatched)
+                .filteredAndSortedForNavigator(
+                    query = navigator.query,
+                    sort = navigator.sort,
+                    isWatched = isWatched,
+                    downloadedOnly = navigator.downloadedOnly,
+                    isDownloaded = isDownloaded,
+                )
                 .indexOfFirst { it.navigatorKey() == key }
             if (position < 0) return@launch
             listState.animateScrollToItem(firstEpisodeIndex + position)
@@ -733,6 +918,7 @@ private fun EpisodeNavigatorStickyBar(
                 state = navigator,
                 shownCount = shownCount,
                 totalCount = seasonEpisodes.size,
+                downloadedCount = seasonEpisodes.count(isDownloaded),
                 onSubmitNumber = { number ->
                     seasonEpisodes.firstOrNull { it.episode == number }?.let(jumpTo)
                 },

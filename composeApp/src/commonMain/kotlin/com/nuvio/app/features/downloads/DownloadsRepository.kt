@@ -85,6 +85,9 @@ object DownloadsRepository {
         }
     }
 
+    fun isPlayableDownload(item: DownloadItem): Boolean =
+        item.hasPlayableLocalFile()
+
     fun playableLocalFileUri(item: DownloadItem): String? {
         ensureLoaded()
         if (item.status != DownloadStatus.Completed) return null

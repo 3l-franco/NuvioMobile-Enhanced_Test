@@ -106,7 +106,10 @@ import com.kyant.backdrop.Backdrop
 import com.nuvio.app.core.ui.glass.LocalLiquidGlassBackdrop
 import com.nuvio.app.core.ui.glass.nuvioBackdropSource
 import com.nuvio.app.core.ui.glass.rememberNuvioBackdrop
+import com.nuvio.app.features.downloads.DownloadsRepository
 import com.nuvio.app.features.downloads.DownloadsSettingsRepository
+import com.nuvio.app.features.details.components.episodeDownloadSeasonKey
+import com.nuvio.app.features.details.components.episodeDownloadVideoKey
 import com.nuvio.app.features.details.components.DetailActions
 import com.nuvio.app.features.details.components.CommentDetailSheet
 import com.nuvio.app.features.details.components.DetailAdditionalInfoSection
@@ -248,6 +251,26 @@ fun MetaDetailsScreen(
         WatchedRepository.ensureLoaded()
         WatchedRepository.uiState
     }.collectAsStateWithLifecycle()
+    val downloadsUiState by remember {
+        DownloadsRepository.ensureLoaded()
+        DownloadsRepository.uiState
+    }.collectAsStateWithLifecycle()
+    val downloadedEpisodeKeys = remember(downloadsUiState.items, id) {
+        buildSet {
+            downloadsUiState.completedItems.forEach { item ->
+                if (
+                    item.parentMetaId == id &&
+                    item.isEpisode &&
+                    DownloadsRepository.isPlayableDownload(item)
+                ) {
+                    val seasonNumber = item.seasonNumber ?: return@forEach
+                    val episodeNumber = item.episodeNumber ?: return@forEach
+                    add(episodeDownloadSeasonKey(item.parentMetaId, seasonNumber, episodeNumber))
+                    add(episodeDownloadVideoKey(item.parentMetaId, item.videoId))
+                }
+            }
+        }
+    }
     val fullyWatchedSeriesKeys by WatchedRepository.fullyWatchedSeriesKeys.collectAsStateWithLifecycle()
     val watchProgressUiState by remember {
         WatchProgressRepository.ensureLoaded()
@@ -2277,6 +2300,7 @@ private fun LazyListScope.configuredMetaSectionItems(
                     onTrailerClick = onTrailerClick,
                     progressByVideoId = progressByVideoId,
                     watchedKeys = watchedKeys,
+                    downloadedEpisodeKeys = downloadedEpisodeKeys,
                     fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
                     blurUnwatchedEpisodes = blurUnwatchedEpisodes,
                     onEpisodeClick = onEpisodeClick,
@@ -2308,6 +2332,7 @@ private fun LazyListScope.configuredMetaSectionItems(
             preferredSeasonNumber = preferredEpisodeSeasonNumber,
             progressByVideoId = progressByVideoId,
             watchedKeys = watchedKeys,
+            downloadedEpisodeKeys = downloadedEpisodeKeys,
             episodeRatingsVisibility = settings.episodeRatingsVisibility,
             blurUnwatchedEpisodes = blurUnwatchedEpisodes,
             onEpisodeClick = onEpisodeClick,
@@ -2463,6 +2488,7 @@ private fun ConfiguredMetaSections(
     onTrailerClick: (MetaTrailer) -> Unit,
     progressByVideoId: Map<String, WatchProgressEntry>,
     watchedKeys: Set<String>,
+    downloadedEpisodeKeys: Set<String>,
     fullyWatchedSeriesKeys: Set<String> = emptySet(),
     blurUnwatchedEpisodes: Boolean,
     onEpisodeClick: (MetaVideo) -> Unit,
@@ -2577,6 +2603,7 @@ private fun ConfiguredMetaSections(
                         episodeCardStyle = settings.episodeCardStyle,
                         progressByVideoId = progressByVideoId,
                         watchedKeys = watchedKeys,
+                        downloadedEpisodeKeys = downloadedEpisodeKeys,
                         episodeRatings = emptyMap(),
                         episodeRatingsVisibility = settings.episodeRatingsVisibility,
                         blurUnwatchedEpisodes = blurUnwatchedEpisodes,

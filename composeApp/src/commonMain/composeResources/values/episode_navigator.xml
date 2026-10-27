@@ -2,6 +2,13 @@
 <resources>
     <string name="episode_navigator_search_hint">Search title, plot or number</string>
     <string name="episode_navigator_clear_search">Clear search</string>
+    <string name="episode_navigator_filter">Filter episodes</string>
+    <string name="episode_navigator_filter_title">Episode display</string>
+    <string name="episode_navigator_filter_all">All episodes</string>
+    <string name="episode_navigator_filter_downloaded">Downloaded only</string>
+    <string name="episode_navigator_filter_show_all">Show all episodes</string>
+    <string name="episode_navigator_no_downloaded">No downloaded episodes in this season</string>
+    <string name="episode_navigator_downloaded_count">%1$d downloaded</string>
     <string name="episode_navigator_go_to">Go to</string>
     <string name="episode_navigator_sort">Sort</string>
     <string name="episode_navigator_count">%1$d of %2$d episodes</string>

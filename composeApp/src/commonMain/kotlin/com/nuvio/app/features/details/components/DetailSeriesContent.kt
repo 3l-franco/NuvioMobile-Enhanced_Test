@@ -37,8 +37,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -110,6 +112,24 @@ private val log = Logger.withTag("SeriesContent")
 private const val VerticalEpisodesInitialVisibleCount = 15
 
 @Composable
+private fun EpisodeDownloadBadge(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .size(24.dp)
+            .clip(CircleShape)
+            .background(Color(0xFF16865B)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.Download,
+            contentDescription = stringResource(Res.string.compose_player_downloaded),
+            tint = Color.White,
+            modifier = Modifier.size(15.dp),
+        )
+    }
+}
+
+@Composable
 fun DetailSeriesContent(
     meta: MetaDetails,
     modifier: Modifier = Modifier,
@@ -120,6 +140,7 @@ fun DetailSeriesContent(
     episodeCardStyle: MetaEpisodeCardStyle = MetaEpisodeCardStyle.Horizontal,
     progressByVideoId: Map<String, WatchProgressEntry> = emptyMap(),
     watchedKeys: Set<String> = emptySet(),
+    downloadedEpisodeKeys: Set<String> = emptySet(),
     episodeRatings: Map<Pair<Int, Int>, Double> = emptyMap(),
     episodeRatingsVisibility: EpisodeRatingsVisibility = EpisodeRatingsVisibility.SHOW_ALL,
     blurUnwatchedEpisodes: Boolean = false,
@@ -237,18 +258,42 @@ fun DetailSeriesContent(
                         val isWatched: (MetaVideo) -> Boolean = { episode ->
                             meta.isEpisodeWatchedForNavigator(episode, progressByVideoId, watchedKeys)
                         }
-                        val shownEpisodes = remember(seasonEpisodes, navigator.query, navigator.sort, progressByVideoId, watchedKeys) {
-                            seasonEpisodes.filteredAndSortedForNavigator(navigator.query, navigator.sort, isWatched)
+                        val isDownloaded: (MetaVideo) -> Boolean = { episode ->
+                            episode.isDownloadedEpisode(meta.id, downloadedEpisodeKeys)
+                        }
+                        val shownEpisodes = remember(
+                            seasonEpisodes,
+                            navigator.query,
+                            navigator.sort,
+                            navigator.downloadedOnly,
+                            progressByVideoId,
+                            watchedKeys,
+                            downloadedEpisodeKeys,
+                        ) {
+                            seasonEpisodes.filteredAndSortedForNavigator(
+                                query = navigator.query,
+                                sort = navigator.sort,
+                                isWatched = isWatched,
+                                downloadedOnly = navigator.downloadedOnly,
+                                isDownloaded = isDownloaded,
+                            )
                         }
                         val jumpTo: (MetaVideo) -> Unit = { target ->
                             navigatorScope.launch {
                                 if (shownEpisodes.none { it.navigatorKey() == target.navigatorKey() }) {
-                                    navigator.query = ""
+                                    if (navigator.downloadedOnly && !isDownloaded(target)) navigator.downloadedOnly = false
+                                    if (navigator.query.isNotEmpty()) navigator.query = ""
                                     withFrameNanos { }
                                     withFrameNanos { }
                                 }
                                 val index = seasonEpisodes
-                                    .filteredAndSortedForNavigator(navigator.query, navigator.sort, isWatched)
+                                    .filteredAndSortedForNavigator(
+                                        query = navigator.query,
+                                        sort = navigator.sort,
+                                        isWatched = isWatched,
+                                        downloadedOnly = navigator.downloadedOnly,
+                                        isDownloaded = isDownloaded,
+                                    )
                                     .indexOfFirst { it.navigatorKey() == target.navigatorKey() }
                                 if (index >= 0) {
                                     rowState.animateScrollToItem(index)
@@ -257,7 +302,7 @@ fun DetailSeriesContent(
                             }
                         }
                         var navigatorOrderInitialized by remember { mutableStateOf(false) }
-                        LaunchedEffect(navigator.sort, navigator.query) {
+                        LaunchedEffect(navigator.sort, navigator.query, navigator.downloadedOnly) {
                             if (navigatorOrderInitialized) rowState.scrollToItem(0)
                             navigatorOrderInitialized = true
                         }
@@ -265,6 +310,7 @@ fun DetailSeriesContent(
                             state = navigator,
                             shownCount = shownEpisodes.size,
                             totalCount = seasonEpisodes.size,
+                            downloadedCount = seasonEpisodes.count(isDownloaded),
                             onSubmitNumber = { number ->
                                 seasonEpisodes.firstOrNull { it.episode == number }?.let(jumpTo)
                             },
@@ -286,11 +332,17 @@ fun DetailSeriesContent(
                             )
                         }
                         if (shownEpisodes.isEmpty()) {
-                            EpisodeNavigatorEmptyState(query = navigator.query, onClear = { navigator.query = "" })
+                            EpisodeNavigatorEmptyState(
+                                query = navigator.query,
+                                onClear = { navigator.query = "" },
+                                downloadedOnly = navigator.downloadedOnly,
+                                onClearDownloadedOnly = { navigator.downloadedOnly = false },
+                            )
                         } else EpisodeHorizontalRow(
                             episodes = shownEpisodes,
                             listState = rowState,
                             highlightedKey = navigator.highlightedEpisodeKey,
+                            downloadedEpisodeKeys = downloadedEpisodeKeys,
                             maxWidthDp = containerWidthDp,
                             horizontalScrollPadding = horizontalScrollPadding,
                             parentMetaId = meta.id,
@@ -347,6 +399,7 @@ fun DetailSeriesContent(
                                     episodeRatingsVisibility = episodeRatingsVisibility,
                                     blurUnwatchedEpisodes = blurUnwatchedEpisodes,
                                     sizing = sizing,
+                                    isDownloaded = episode.isDownloadedEpisode(meta.id, downloadedEpisodeKeys),
                                     onClick = { onEpisodeClick?.invoke(episode) },
                                     onLongPress = { onEpisodeLongPress?.invoke(episode) },
                                 )
@@ -420,6 +473,7 @@ internal fun DetailSeriesListEpisode(
     episodeRatings: Map<Pair<Int, Int>, Double>,
     episodeRatingsVisibility: EpisodeRatingsVisibility,
     blurUnwatchedEpisodes: Boolean,
+    downloadedEpisodeKeys: Set<String>,
     onEpisodeClick: ((MetaVideo) -> Unit)?,
     onEpisodeLongPress: ((MetaVideo) -> Unit)?,
     modifier: Modifier = Modifier,
@@ -452,6 +506,7 @@ internal fun DetailSeriesListEpisode(
             episodeRatingsVisibility = episodeRatingsVisibility,
             blurUnwatchedEpisodes = blurUnwatchedEpisodes,
             sizing = sizing,
+            isDownloaded = episode.isDownloadedEpisode(meta.id, downloadedEpisodeKeys),
             modifier = Modifier.episodeJumpHighlight(jumpHighlighted),
             highlightQuery = highlightQuery,
             onClick = { onEpisodeClick?.invoke(episode) },
@@ -844,6 +899,7 @@ private fun EpisodeHorizontalRow(
     parentMetaId: String,
     metaType: String,
     watchedKeys: Set<String>,
+    downloadedEpisodeKeys: Set<String>,
     fallbackImage: String?,
     progressByVideoId: Map<String, WatchProgressEntry>,
     episodeRatings: Map<Pair<Int, Int>, Double>,
@@ -915,6 +971,7 @@ private fun EpisodeHorizontalRow(
                         metaId = parentMetaId,
                         episode = episode,
                     ),
+                isDownloaded = episode.isDownloadedEpisode(parentMetaId, downloadedEpisodeKeys),
                 episodeRatingsVisibility = episodeRatingsVisibility,
                 blurUnwatchedEpisodes = blurUnwatchedEpisodes,
                 metrics = rowMetrics,
@@ -936,6 +993,7 @@ private fun EpisodeHorizontalCard(
     tmdbRating: Double?,
     imdbRating: Double?,
     isWatched: Boolean,
+    isDownloaded: Boolean = false,
     episodeRatingsVisibility: EpisodeRatingsVisibility,
     blurUnwatchedEpisodes: Boolean,
     metrics: EpisodeHorizontalCardMetrics,
@@ -1012,6 +1070,14 @@ private fun EpisodeHorizontalCard(
                     ),
                 ),
         )
+
+        if (isDownloaded) {
+            EpisodeDownloadBadge(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(metrics.contentPadding),
+            )
+        }
 
         NuvioAnimatedWatchedBadge(
             isVisible = isWatched,
@@ -1393,6 +1459,7 @@ private fun EpisodeListCard(
     tmdbRating: Double?,
     imdbRating: Double?,
     isWatched: Boolean,
+    isDownloaded: Boolean = false,
     episodeRatingsVisibility: EpisodeRatingsVisibility,
     blurUnwatchedEpisodes: Boolean,
     sizing: SeriesContentSizing,
@@ -1487,6 +1554,13 @@ private fun EpisodeListCard(
                         .align(Alignment.TopEnd)
                         .padding(8.dp),
                 )
+                if (isDownloaded) {
+                    EpisodeDownloadBadge(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(8.dp),
+                    )
+                }
             }
 
             Column(
