@@ -1683,6 +1683,14 @@ private fun LibmpvPlayerSurface(
         playerViewRef?.applyResizeMode(resizeMode)
     }
 
+    LaunchedEffect(playerViewRef) {
+        val view = playerViewRef ?: return@LaunchedEffect
+        PlayerSettingsRepository.uiState
+            .map { it.nightModeActive }
+            .distinctUntilChanged()
+            .collect { view.applyNightMode(it) }
+    }
+
     LaunchedEffect(playerViewRef, sourceUrl, sourceAudioUrl, sanitizedSourceHeaders, externalSubtitles) {
         val view = playerViewRef ?: return@LaunchedEffect
         onControllerReady(
@@ -2125,6 +2133,16 @@ private class NuvioLibmpvView(
                     }
                 }.getOrDefault("unavailable")
             }
+        }
+    }
+
+    fun applyNightMode(enabled: Boolean) {
+        executeMpv {
+            runCatching { mpv.command("af", "remove", PlayerNightMode.MPV_FILTER_LABEL) }
+            if (enabled) {
+                mpv.command("af", "add", PlayerNightMode.MPV_FILTER)
+            }
+            Log.d(TAG, "libmpv night mode ${if (enabled) "on" else "off"} af=${runCatching { mpv.getPropertyString("af") }.getOrNull()}")
         }
     }
 
