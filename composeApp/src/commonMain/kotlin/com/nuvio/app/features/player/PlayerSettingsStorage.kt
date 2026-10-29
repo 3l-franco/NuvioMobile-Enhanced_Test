@@ -25,6 +25,8 @@ internal expect object PlayerSettingsStorage {
     fun saveHoldToSpeedValue(speed: Float)
     fun loadSkipBackwardSeconds(): Int?
     fun saveSkipBackwardSeconds(seconds: Int)
+    fun loadSkipIntroOffsetSeconds(): Int?
+    fun saveSkipIntroOffsetSeconds(seconds: Int)
     fun loadSkipForwardSeconds(): Int?
     fun saveSkipForwardSeconds(seconds: Int)
     fun loadToolbarLayout(): String?

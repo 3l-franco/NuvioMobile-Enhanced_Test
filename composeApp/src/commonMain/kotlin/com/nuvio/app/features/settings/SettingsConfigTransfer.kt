@@ -705,6 +705,7 @@ internal object SettingsConfigTransfer {
         PlayerSettingsStorage.loadHoldToSpeedEnabled()?.let { put("hold_to_speed_enabled", encodeSyncBoolean(it)) }
         PlayerSettingsStorage.loadHoldToSpeedValue()?.let { put("hold_to_speed_value", encodeSyncFloat(it)) }
         PlayerSettingsStorage.loadSkipBackwardSeconds()?.let { put("skip_backward_seconds", encodeSyncInt(it)) }
+        PlayerSettingsStorage.loadSkipIntroOffsetSeconds()?.let { put("skip_intro_offset_seconds", encodeSyncInt(it)) }
         PlayerSettingsStorage.loadToolbarLayout()?.let { put("player_toolbar_layout", encodeSyncString(it)) }
         PlayerSettingsStorage.loadLegacyBottomButtons()?.let { put("legacy_player_bottom_buttons", encodeSyncString(it)) }
         PlayerSettingsStorage.loadLegacyTopButtons()?.let { put("legacy_player_top_buttons", encodeSyncString(it)) }
@@ -813,6 +814,7 @@ internal object SettingsConfigTransfer {
         payload.decodeSyncBoolean("hold_to_speed_enabled")?.let { PlayerSettingsStorage.saveHoldToSpeedEnabled(it) }
         payload.decodeSyncFloat("hold_to_speed_value")?.let { PlayerSettingsStorage.saveHoldToSpeedValue(it) }
         payload.decodeSyncInt("skip_backward_seconds")?.let { PlayerSettingsStorage.saveSkipBackwardSeconds(it) }
+        payload.decodeSyncInt("skip_intro_offset_seconds")?.let { PlayerSettingsStorage.saveSkipIntroOffsetSeconds(it) }
         payload.decodeSyncString("player_toolbar_layout")?.let { PlayerSettingsStorage.saveToolbarLayout(it) }
         payload.decodeSyncString("legacy_player_bottom_buttons")?.let { PlayerSettingsStorage.saveLegacyBottomButtons(it) }
         payload.decodeSyncString("legacy_player_top_buttons")?.let { PlayerSettingsStorage.saveLegacyTopButtons(it) }

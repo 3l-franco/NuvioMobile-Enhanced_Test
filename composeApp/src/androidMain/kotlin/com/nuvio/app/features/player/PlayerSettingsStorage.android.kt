@@ -30,6 +30,7 @@ actual object PlayerSettingsStorage {
     private const val holdToSpeedEnabledKey = "hold_to_speed_enabled"
     private const val holdToSpeedValueKey = "hold_to_speed_value"
     private const val skipBackwardSecondsKey = "skip_backward_seconds"
+    private const val skipIntroOffsetSecondsKey = "skip_intro_offset_seconds"
     private const val toolbarLayoutKey = "player_toolbar_layout"
     private const val legacyBottomButtonsKey = "legacy_player_bottom_buttons"
     private const val legacyTopButtonsKey = "legacy_player_top_buttons"
@@ -386,6 +387,10 @@ actual object PlayerSettingsStorage {
     actual fun loadSkipBackwardSeconds(): Int? = loadLocalInt(skipBackwardSecondsKey)
 
     actual fun saveSkipBackwardSeconds(seconds: Int) = saveLocalInt(skipBackwardSecondsKey, seconds)
+
+    actual fun loadSkipIntroOffsetSeconds(): Int? = loadLocalInt(skipIntroOffsetSecondsKey)
+
+    actual fun saveSkipIntroOffsetSeconds(seconds: Int) = saveLocalInt(skipIntroOffsetSecondsKey, seconds)
 
     actual fun loadSkipForwardSeconds(): Int? = loadLocalInt(skipForwardSecondsKey)
 

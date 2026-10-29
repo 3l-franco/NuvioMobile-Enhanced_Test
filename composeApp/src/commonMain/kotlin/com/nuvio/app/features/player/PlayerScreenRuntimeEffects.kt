@@ -630,8 +630,7 @@ private fun PlayerScreenRuntime.BindPlayerMetadataAndSkipEffects() {
             autoSkippedIntervals += skipIntervals.intervalsAtSeekPositions(fromMs, toMs)
         }
         val current = skipIntervals.firstOrNull { interval ->
-            // Fork: intro-like segments show the button a few seconds early (pre-roll).
-            interval.isEligibleForSkipButton(positionSec) &&
+            interval.isEligibleForSkipButton(positionSec, playerSettingsUiState.skipIntroOffsetSeconds) &&
                 interval.internalSkipAction(skipIntervals, playbackSnapshot.durationMs) != null
         }
         if (current != activeSkipInterval) {
@@ -643,8 +642,7 @@ private fun PlayerScreenRuntime.BindPlayerMetadataAndSkipEffects() {
             playerControllerSourceUrl == activeSourceUrl &&
             playerSettingsUiState.skipIntroEnabled && playbackSnapshot.isPlaying &&
             !isScrubbingTimeline && initialSeekApplied && !isPartyControlLocked &&
-            // The pre-roll only reveals the button; auto-skip waits for the segment itself.
-            positionSec >= current.startTime &&
+            positionSec >= maxOf(current.startTime, current.skipButtonStartTime(playerSettingsUiState.skipIntroOffsetSeconds)) &&
             current.shouldAutoSkip(playerSettingsUiState.autoSkipSegmentTypes) &&
             current !in autoSkippedIntervals
         ) {
@@ -999,14 +997,15 @@ private fun findCredentialRefreshCandidate(
         .maxByOrNull { (score, _) -> score }
         ?.second
 
-private fun SkipInterval.isEligibleForSkipButton(positionSec: Double): Boolean {
-    val effectiveStartTime = if (isIntroLikeSkipInterval()) {
-        (startTime - SKIP_INTRO_PRE_ROLL_SECONDS).coerceAtLeast(0.0)
+private fun SkipInterval.isEligibleForSkipButton(positionSec: Double, offsetSeconds: Int): Boolean =
+    positionSec >= skipButtonStartTime(offsetSeconds) && positionSec < endTime
+
+private fun SkipInterval.skipButtonStartTime(offsetSeconds: Int): Double =
+    if (isIntroLikeSkipInterval() && offsetSeconds != 0) {
+        (startTime + offsetSeconds).coerceIn(0.0, maxOf(startTime, endTime - 1.0))
     } else {
         startTime
     }
-    return positionSec >= effectiveStartTime && positionSec < endTime
-}
 
 private fun SkipInterval.isIntroLikeSkipInterval(): Boolean =
     when (type.lowercase()) {
@@ -1014,6 +1013,5 @@ private fun SkipInterval.isIntroLikeSkipInterval(): Boolean =
         else -> false
     }
 
-private const val SKIP_INTRO_PRE_ROLL_SECONDS = 10.0
 private const val CREDENTIAL_REFRESH_POLL_COUNT = 30
 private const val CREDENTIAL_REFRESH_POLL_INTERVAL_MS = 500L
