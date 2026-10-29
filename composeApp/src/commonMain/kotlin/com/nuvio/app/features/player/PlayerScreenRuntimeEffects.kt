@@ -278,11 +278,7 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
     ) {
         val controller = playerController ?: return@LaunchedEffect
         val controllerSourceUrl = playerControllerSourceUrl ?: return@LaunchedEffect
-        val controllerMatchesActivePlayback =
-            controllerSourceUrl == activeSourceUrl ||
-                controllerSourceUrl == activePlaybackSourceUrl ||
-                controllerSourceUrl == p2pResolvedSourceUrl
-        if (!controllerMatchesActivePlayback) return@LaunchedEffect
+        if (!isControllerOnActivePlayback(controllerSourceUrl)) return@LaunchedEffect
         controller.updateNowPlayingMetadata(buildNowPlayingInfo())
     }
 
@@ -297,8 +293,11 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
         fetchAddonSubtitlesForActiveItem()
     }
 
-    LaunchedEffect(playerController, playerControllerSourceUrl, activeSourceUrl, preferredAudioLanguageTargets) {
-        if (playerControllerSourceUrl == activeSourceUrl) {
+    LaunchedEffect(
+        playerController, playerControllerSourceUrl, activeSourceUrl, activePlaybackSourceUrl, p2pResolvedSourceUrl,
+        preferredAudioLanguageTargets,
+    ) {
+        if (isControllerOnActivePlayback()) {
             applyPreferredAudioTrack(preferredAudioLanguageTargets)
         }
     }
@@ -368,11 +367,7 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
     ) {
         val controller = playerController ?: return@LaunchedEffect
         val controllerSourceUrl = playerControllerSourceUrl ?: return@LaunchedEffect
-        val controllerMatchesActivePlayback =
-            controllerSourceUrl == activeSourceUrl ||
-                controllerSourceUrl == activePlaybackSourceUrl ||
-                controllerSourceUrl == p2pResolvedSourceUrl
-        if (!controllerMatchesActivePlayback) return@LaunchedEffect
+        if (!isControllerOnActivePlayback(controllerSourceUrl)) return@LaunchedEffect
         if (initialSeekApplied || playbackSnapshot.isLoading) return@LaunchedEffect
         if (isPartySynced && PartyRepository.playback.value != null) {
             initialSeekApplied = true
@@ -639,7 +634,7 @@ private fun PlayerScreenRuntime.BindPlayerMetadataAndSkipEffects() {
         }
         val controller = playerController
         if (current != null && controller != null &&
-            playerControllerSourceUrl == activeSourceUrl &&
+            isControllerOnActivePlayback() &&
             playerSettingsUiState.skipIntroEnabled && playbackSnapshot.isPlaying &&
             !isScrubbingTimeline && initialSeekApplied && !isPartyControlLocked &&
             positionSec >= maxOf(current.startTime, current.skipButtonStartTime(playerSettingsUiState.skipIntroOffsetSeconds)) &&
@@ -996,6 +991,15 @@ private fun findCredentialRefreshCandidate(
         }
         .maxByOrNull { (score, _) -> score }
         ?.second
+
+internal fun PlayerScreenRuntime.isControllerOnActivePlayback(
+    controllerSourceUrl: String? = playerControllerSourceUrl,
+): Boolean =
+    controllerSourceUrl != null && (
+        controllerSourceUrl == activeSourceUrl ||
+            controllerSourceUrl == activePlaybackSourceUrl ||
+            controllerSourceUrl == p2pResolvedSourceUrl
+        )
 
 private fun SkipInterval.isEligibleForSkipButton(positionSec: Double, offsetSeconds: Int): Boolean =
     positionSec >= skipButtonStartTime(offsetSeconds) && positionSec < endTime
