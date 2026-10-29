@@ -624,28 +624,40 @@ private fun PlayerScreenRuntime.BindPlayerMetadataAndSkipEffects() {
         lastManualSkipSeekPositions?.let { (fromMs, toMs) ->
             autoSkippedIntervals += skipIntervals.intervalsAtSeekPositions(fromMs, toMs)
         }
-        val current = skipIntervals.firstOrNull { interval ->
-            interval.isEligibleForSkipButton(positionSec, playerSettingsUiState.skipIntroOffsetSeconds) &&
-                interval.internalSkipAction(skipIntervals, playbackSnapshot.durationMs) != null
+        val offsetSeconds = playerSettingsUiState.skipIntroOffsetSeconds
+        val durationMs = playbackSnapshot.durationMs
+        val eligible = skipIntervals.mapNotNull { interval ->
+            if (!interval.isEligibleForSkipButton(positionSec, offsetSeconds)) return@mapNotNull null
+            val action = interval.internalSkipAction(skipIntervals, durationMs) ?: return@mapNotNull null
+            interval to action
         }
+        val current = (eligible.filter { (interval, _) -> positionSec >= interval.startTime }.ifEmpty { eligible })
+            .maxByOrNull { (_, action) -> action.targetMs }
+            ?.first
         if (current != activeSkipInterval) {
             activeSkipInterval = current
             if (current != null) skipIntervalDismissed = false
         }
         val controller = playerController
-        if (current != null && controller != null &&
+        val autoSkip = if (controller != null &&
             isControllerOnActivePlayback() &&
             playerSettingsUiState.skipIntroEnabled && playbackSnapshot.isPlaying &&
-            !isScrubbingTimeline && initialSeekApplied && !isPartyControlLocked &&
-            positionSec >= maxOf(current.startTime, current.skipButtonStartTime(playerSettingsUiState.skipIntroOffsetSeconds)) &&
-            current.shouldAutoSkip(playerSettingsUiState.autoSkipSegmentTypes) &&
-            current !in autoSkippedIntervals
+            !isScrubbingTimeline && initialSeekApplied && !isPartyControlLocked
         ) {
-            val durationMs = playbackSnapshot.durationMs
-            val rawMs = current.internalSkipAction(skipIntervals, durationMs)?.targetMs ?: return@LaunchedEffect
+            eligible.filter { (interval, _) ->
+                positionSec >= maxOf(interval.startTime, interval.skipButtonStartTime(offsetSeconds)) &&
+                    interval.shouldAutoSkip(playerSettingsUiState.autoSkipSegmentTypes) &&
+                    interval !in autoSkippedIntervals
+            }.maxByOrNull { (_, action) -> action.targetMs }
+        } else {
+            null
+        }
+        if (controller != null && autoSkip != null) {
+            val (interval, action) = autoSkip
+            val rawMs = action.targetMs
             val seekPositionMs = if (durationMs > 0L) rawMs.coerceAtMost(durationMs - 1) else rawMs
-            val notification = current.autoSkipNotificationMessage(seekPositionMs)
-            autoSkippedIntervals.add(current)
+            val notification = interval.autoSkipNotificationMessage(seekPositionMs)
+            autoSkippedIntervals.add(interval)
             controller.seekTo(seekPositionMs)
             scheduleProgressSyncAfterSeek()
             publishPartyPlayback(positionMs = seekPositionMs)
