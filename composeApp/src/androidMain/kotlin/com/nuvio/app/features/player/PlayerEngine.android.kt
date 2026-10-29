@@ -1623,6 +1623,9 @@ private fun LibmpvPlayerSurface(
         }
         val logObserver = object : MPV.LogObserver {
             override fun logMessage(prefix: String, level: Int, text: String) {
+                if (prefix == "af" || prefix == "lavfi" || prefix.startsWith("af/") || text.contains("acompressor")) {
+                    InAppLogger.warn("Player/NightMode", "mpv $prefix: ${text.trim()}")
+                }
                 Log.w(
                     PLAYER_DIAGNOSTIC_TAG,
                     "mpv_log level=$level prefix=${diagnosticPlayerMessage(prefix)} " +
@@ -2142,7 +2145,11 @@ private class NuvioLibmpvView(
             if (enabled) {
                 mpv.command("af", "add", PlayerNightMode.MPV_FILTER)
             }
-            Log.d(TAG, "libmpv night mode ${if (enabled) "on" else "off"} af=${runCatching { mpv.getPropertyString("af") }.getOrNull()}")
+            val chain = runCatching { mpv.getPropertyString("af") }.getOrNull()
+            InAppLogger.info("Player/NightMode", "libmpv night mode ${if (enabled) "on" else "off"} af=$chain")
+            if (enabled && chain?.contains(PlayerNightMode.MPV_FILTER_LABEL) != true) {
+                InAppLogger.warn("Player/NightMode", "libmpv did not keep the night mode filter; acompressor may be missing from its FFmpeg build")
+            }
         }
     }
 
