@@ -143,14 +143,9 @@ internal fun SubtitleAppearanceSettings(
                 SettingsSliderRow(
                     title = stringResource(Res.string.subtitle_shadow_opacity),
                     value = style.appearance.shadowOpacity, valueText = { "$it%" },
-                    valueRange = 0..100, step = 5, isTablet = isTablet, enabled = enabled,
+                    valueRange = MIN_SUBTITLE_SHADOW_OPACITY..MAX_SUBTITLE_SHADOW_OPACITY,
+                    step = 10, isTablet = isTablet, enabled = enabled,
                     onValueChange = { onStyleChanged(style.copy(appearance = style.appearance.copy(shadowOpacity = it))) },
-                )
-                SettingsSliderRow(
-                    title = stringResource(Res.string.subtitle_shadow_size),
-                    value = style.appearance.shadowSize, valueText = { it.toString() },
-                    valueRange = 1..8, step = 1, isTablet = isTablet, enabled = enabled,
-                    onValueChange = { onStyleChanged(style.copy(appearance = style.appearance.copy(shadowSize = it))) },
                 )
             }
         }

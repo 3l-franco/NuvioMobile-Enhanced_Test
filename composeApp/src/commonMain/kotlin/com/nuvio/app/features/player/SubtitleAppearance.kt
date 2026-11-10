@@ -1,5 +1,6 @@
 package com.nuvio.app.features.player
 
+import androidx.compose.ui.graphics.Color
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -8,15 +9,16 @@ import kotlinx.serialization.json.Json
 data class SubtitleAppearance(
     val fontId: String = "default",
     val backgroundRadius: Int = 0,
-    val shadowEnabled: Boolean = false,
-    val shadowOpacity: Int = 75,
+    val shadowEnabled: Boolean = true,
+    val shadowOpacity: Int = DEFAULT_SUBTITLE_SHADOW_OPACITY,
+    /** Retained only so older saved profiles continue to decode without losing the field. */
     val shadowSize: Int = 2,
     val outlineBlur: Int = 0,
 ) {
     fun normalized(): SubtitleAppearance = copy(
         fontId = fontId.takeIf { it in BuiltInSubtitleFonts || it.matches(Regex("custom-[a-f0-9-]{36}")) } ?: "default",
         backgroundRadius = backgroundRadius.coerceIn(0, 24),
-        shadowOpacity = shadowOpacity.coerceIn(0, 100),
+        shadowOpacity = normalizeSubtitleShadowOpacity(shadowOpacity),
         shadowSize = shadowSize.coerceIn(1, 8),
         outlineBlur = outlineBlur.coerceIn(SUBTITLE_OUTLINE_BLUR_MIN, SUBTITLE_OUTLINE_BLUR_MAX),
     )
@@ -24,6 +26,30 @@ data class SubtitleAppearance(
 
 const val SUBTITLE_OUTLINE_BLUR_MIN = 0
 const val SUBTITLE_OUTLINE_BLUR_MAX = 10
+
+internal const val DEFAULT_SUBTITLE_SHADOW_OPACITY = 70
+internal const val MIN_SUBTITLE_SHADOW_OPACITY = 10
+internal const val MAX_SUBTITLE_SHADOW_OPACITY = 100
+internal const val SUBTITLE_SHADOW_OFFSET_RATIO = 2f / 24f
+internal const val SUBTITLE_SHADOW_RADIUS_RATIO = 0.75f / 24f
+
+/** Match the reference fork's nearest-10% steps, with a 10..100% enabled range. */
+internal fun normalizeSubtitleShadowOpacity(value: Int): Int {
+    val bounded = value.coerceIn(MIN_SUBTITLE_SHADOW_OPACITY, MAX_SUBTITLE_SHADOW_OPACITY)
+    return (((bounded + 5) / 10) * 10).coerceIn(MIN_SUBTITLE_SHADOW_OPACITY, MAX_SUBTITLE_SHADOW_OPACITY)
+}
+
+internal fun subtitleShadowOffsetPx(textSizePx: Float): Float =
+    textSizePx.coerceAtLeast(0f) * SUBTITLE_SHADOW_OFFSET_RATIO
+
+internal fun subtitleShadowBlurRadiusPx(textSizePx: Float): Float =
+    textSizePx.coerceAtLeast(0f) * SUBTITLE_SHADOW_RADIUS_RATIO
+
+internal val SubtitleStyleState.drawsSubtitleShadow: Boolean
+    get() = appearance.shadowEnabled && backgroundColor.alpha <= 0f
+
+internal val SubtitleStyleState.subtitleShadowColor: Color
+    get() = Color.Black.copy(alpha = normalizeSubtitleShadowOpacity(appearance.shadowOpacity) / 100f)
 
 internal const val SUBTITLE_BLUR_REFERENCE_HEIGHT_PX = 720f
 internal const val SUBTITLE_BLUR_REFERENCE_WIDTH_PX = 1280f
@@ -100,7 +126,6 @@ internal fun SubtitleAppearance.encode(): String = subtitleAppearanceJson.encode
 internal val SubtitleStyleState.requiresComposeStyledOverlay: Boolean
     get() = appearance.fontId != "default" ||
         backgroundColor.alpha > 0f ||
-        appearance.shadowEnabled ||
         (outlineEnabled && outlineWidth > 0 && appearance.outlineBlur > SUBTITLE_OUTLINE_BLUR_MIN)
 
 internal val SubtitleStyleState.usesStyledOverlay: Boolean

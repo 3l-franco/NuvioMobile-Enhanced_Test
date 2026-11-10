@@ -135,8 +135,9 @@ internal fun StyledSubtitleText(
             paddingY + edgePaddingPx,
         )
         val radius = with(density) { (style.appearance.backgroundRadius.dp * scale).toPx() }
-        val shadowSize = with(density) { (style.appearance.shadowSize.dp * scale).toPx() }
-        val shadowOpacity = style.appearance.shadowOpacity.coerceIn(0, 100) / 100f
+        val textSizePx = with(density) { (style.fontSizeSp * scale).sp.toPx() }
+        val shadowOffsetPx = subtitleShadowOffsetPx(textSizePx)
+        val shadowBlurRadiusPx = subtitleShadowBlurRadiusPx(textSizePx)
 
         Box(
             Modifier.requiredWidth(boxWidth)
@@ -156,30 +157,18 @@ internal fun StyledSubtitleText(
                 )
             }
 
-            if (style.appearance.shadowEnabled && shadowOpacity > 0f) {
+            if (style.drawsSubtitleShadow) {
+                // Match the reference: a compact shadow, positioned behind the outline/fill.
                 Canvas(Modifier.fillMaxSize()) {
-                    // Tight, dense shadow gives the opacity control real visual weight.
                     drawText(
                         layout,
                         color = Color.Transparent,
                         topLeft = origin,
                         drawStyle = Fill,
                         shadow = Shadow(
-                            color = Color.Black.copy(alpha = shadowOpacity),
-                            offset = Offset(shadowSize * 0.55f, shadowSize * 0.55f),
-                            blurRadius = (shadowSize * 0.35f).coerceAtLeast(0.5f),
-                        ),
-                    )
-                    // A wider, lighter pass keeps the shadow soft without washing out its core.
-                    drawText(
-                        layout,
-                        color = Color.Transparent,
-                        topLeft = origin,
-                        drawStyle = Fill,
-                        shadow = Shadow(
-                            color = Color.Black.copy(alpha = shadowOpacity * 0.45f),
-                            offset = Offset(shadowSize, shadowSize),
-                            blurRadius = shadowSize * 1.8f,
+                            color = style.subtitleShadowColor,
+                            offset = Offset(shadowOffsetPx, shadowOffsetPx),
+                            blurRadius = shadowBlurRadiusPx,
                         ),
                     )
                 }

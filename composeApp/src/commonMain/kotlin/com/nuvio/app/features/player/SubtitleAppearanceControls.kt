@@ -108,12 +108,12 @@ internal fun SubtitleAppearanceControls(
         }
         if (style.appearance.shadowEnabled) {
             SubtitleValueControl(
-                stringResource(Res.string.subtitle_shadow_opacity), style.appearance.shadowOpacity, 0..100, 5,
+                stringResource(Res.string.subtitle_shadow_opacity),
+                style.appearance.shadowOpacity,
+                MIN_SUBTITLE_SHADOW_OPACITY..MAX_SUBTITLE_SHADOW_OPACITY,
+                10,
                 display = "${style.appearance.shadowOpacity}%",
             ) { onStyleChanged(style.copy(appearance = style.appearance.copy(shadowOpacity = it))) }
-            SubtitleValueControl(stringResource(Res.string.subtitle_shadow_size), style.appearance.shadowSize, 1..8, 1) {
-                onStyleChanged(style.copy(appearance = style.appearance.copy(shadowSize = it)))
-            }
         }
         SubtitleValueControl(stringResource(Res.string.compose_player_bottom_offset), style.bottomOffset, 0..200, 5) {
             onStyleChanged(style.copy(bottomOffset = it))

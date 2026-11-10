@@ -10,8 +10,11 @@ class SubtitleAppearanceTest {
     @Test
     fun oldAndInvalidSettingsKeepExistingAppearance() {
         listOf(null, "", "{", "null").forEach { assertEquals(SubtitleAppearance(), decodeSubtitleAppearance(it)) }
+        assertTrue(SubtitleAppearance().shadowEnabled)
+        assertEquals(DEFAULT_SUBTITLE_SHADOW_OPACITY, SubtitleAppearance().shadowOpacity)
         assertFalse(SubtitleStyleState.DEFAULT.usesStyledOverlay)
         assertEquals(SubtitleAppearance(shadowEnabled = true), decodeSubtitleAppearance("""{"shadowEnabled":true,"future":1}"""))
+        assertFalse(decodeSubtitleAppearance("""{"shadowEnabled":false,"shadowOpacity":40}""").shadowEnabled)
     }
 
     @Test
@@ -19,8 +22,33 @@ class SubtitleAppearanceTest {
         val style = decodeSubtitleAppearance("""{"fontId":"../../font.ttf","backgroundRadius":999,"shadowOpacity":-1,"shadowSize":999}""")
         assertEquals("default", style.fontId)
         assertEquals(24, style.backgroundRadius)
-        assertEquals(0, style.shadowOpacity)
+        assertEquals(MIN_SUBTITLE_SHADOW_OPACITY, style.shadowOpacity)
         assertEquals(8, style.shadowSize)
+    }
+
+    @Test
+    fun shadowOpacityMatchesReferenceTenPercentSteps() {
+        assertEquals(10, normalizeSubtitleShadowOpacity(-20))
+        assertEquals(10, normalizeSubtitleShadowOpacity(4))
+        assertEquals(20, normalizeSubtitleShadowOpacity(15))
+        assertEquals(70, normalizeSubtitleShadowOpacity(72))
+        assertEquals(80, normalizeSubtitleShadowOpacity(75))
+        assertEquals(100, normalizeSubtitleShadowOpacity(250))
+    }
+
+    @Test
+    fun shadowGeometryScalesWithSubtitleTextSize() {
+        assertEquals(4f, subtitleShadowOffsetPx(48f), 0.0001f)
+        assertEquals(1.5f, subtitleShadowBlurRadiusPx(48f), 0.0001f)
+    }
+
+    @Test
+    fun shadowIsDisabledWhenSubtitleBackgroundBoxIsVisible() {
+        val default = SubtitleStyleState.DEFAULT
+        assertTrue(default.drawsSubtitleShadow)
+        assertEquals(0xB3000000.toInt(), default.subtitleShadowColor.toArgb())
+        assertFalse(default.copy(backgroundColor = Color.Black.copy(alpha = 0.5f)).drawsSubtitleShadow)
+        assertFalse(default.copy(appearance = default.appearance.copy(shadowEnabled = false)).drawsSubtitleShadow)
     }
 
     @Test
@@ -65,6 +93,13 @@ class SubtitleAppearanceTest {
         val unknown = subtitleVideoBoundsPx(0f, 0f, 0f, PlayerResizeMode.Fit)
         assertEquals(0f, unknown.width)
         assertEquals(0f, unknown.height)
+    }
+
+    @Test
+    fun shadowAloneStaysOnTheNativeLibmpvPath() {
+        assertTrue(SubtitleStyleState.DEFAULT.drawsSubtitleShadow)
+        assertFalse(SubtitleStyleState.DEFAULT.requiresComposeStyledOverlay)
+        assertFalse(SubtitleStyleState.DEFAULT.usesStyledOverlay)
     }
 
     @Test
