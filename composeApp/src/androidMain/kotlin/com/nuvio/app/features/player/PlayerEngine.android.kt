@@ -2828,12 +2828,8 @@ private class NuvioLibmpvView(
                     mpv.setPropertyString("sub-ass-override", "no")
                     mpv.setPropertyString("sub-color", style.textColor.toMpvColor())
                     mpv.setPropertyString("sub-back-color", style.backgroundColor.toMpvColor())
-                    val nativeOutlineColor = style.outlineColor.copy(
-                        alpha = style.outlineColor.alpha * style.textColor.alpha *
-                            subtitleOutlineBlurOpacity(style.mpvNativeOutlineBlurLevel),
-                    )
-                    mpv.setPropertyString("sub-outline-color", nativeOutlineColor.toMpvColor())
-                    mpv.setPropertyString("sub-border-color", nativeOutlineColor.toMpvColor())
+                    mpv.setPropertyString("sub-outline-color", style.outlineColor.toMpvColor())
+                    mpv.setPropertyString("sub-border-color", style.outlineColor.toMpvColor())
                     mpv.setPropertyString("sub-border-style", style.toMpvSubtitleBorderStyle())
                     mpv.setPropertyString("sub-bold", if (style.bold) "yes" else "no")
                     mpv.setPropertyInt("sub-font-size", style.toMpvSubtitleFontSize())

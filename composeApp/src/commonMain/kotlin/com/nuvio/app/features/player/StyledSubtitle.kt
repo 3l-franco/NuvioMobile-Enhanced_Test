@@ -186,11 +186,15 @@ internal fun StyledSubtitleText(
             }
 
             if (outlineEnabled) {
-                val outlineBlurOpacity = subtitleOutlineBlurOpacity(outlineBlur)
                 val outlineColor = style.outlineColor.copy(
-                    alpha = style.outlineColor.alpha * style.textColor.alpha * outlineBlurOpacity,
+                    alpha = style.outlineColor.alpha * style.textColor.alpha,
                 )
                 if (outlineBlur > 0) {
+                    // Diffuse halo: keep enough ink for the blur to remain visible
+                    // from peripheral vision instead of fading the whole outline.
+                    val haloColor = outlineColor.copy(
+                        alpha = outlineColor.alpha * SUBTITLE_OUTLINE_BLUR_HALO_ALPHA,
+                    )
                     if (useNativeBlur) {
                         Canvas(
                             Modifier.fillMaxSize().blur(
@@ -201,16 +205,13 @@ internal fun StyledSubtitleText(
                         ) {
                             drawText(
                                 layout,
-                                color = outlineColor,
+                                color = haloColor,
                                 topLeft = origin,
                                 drawStyle = Stroke(outline * 2f),
                                 shadow = Shadow.None,
                             )
                         }
                     } else {
-                        val maskShadowColor = outlineColor.copy(
-                            alpha = outlineColor.alpha.coerceAtMost(0.999f),
-                        )
                         Canvas(Modifier.fillMaxSize()) {
                             drawText(
                                 layout,
@@ -218,12 +219,25 @@ internal fun StyledSubtitleText(
                                 topLeft = origin,
                                 drawStyle = Stroke(outline * 2f),
                                 shadow = Shadow(
-                                    color = maskShadowColor,
+                                    color = haloColor.copy(alpha = haloColor.alpha.coerceAtMost(0.999f)),
                                     offset = Offset.Zero,
                                     blurRadius = legacyBlurRadiusPx,
                                 ),
                             )
                         }
+                    }
+
+                    // A slim, stable edge preserves a hint of black around the glyphs.
+                    Canvas(Modifier.fillMaxSize()) {
+                        drawText(
+                            layout,
+                            color = outlineColor.copy(
+                                alpha = outlineColor.alpha * SUBTITLE_OUTLINE_BLUR_CORE_ALPHA,
+                            ),
+                            topLeft = origin,
+                            drawStyle = Stroke(outline * SUBTITLE_OUTLINE_BLUR_CORE_WIDTH_FACTOR),
+                            shadow = Shadow.None,
+                        )
                     }
                 } else {
                     Canvas(Modifier.fillMaxSize()) {

@@ -31,15 +31,9 @@ internal const val SUBTITLE_BLUR_SIGMA_FACTOR = 0.8493218f
 internal const val SUBTITLE_BLUR_SOFTNESS_SCALE = 1.5f
 internal const val SUBTITLE_BLUR_OUTSET_SIGMAS = 3f
 internal const val MPV_SUBTITLE_BLUR_MAX = 20f
-
-/**
- * Reduce the outline's ink density as blur increases. This prevents a blurred
- * outline from looking like a wider, still-opaque border.
- */
-internal fun subtitleOutlineBlurOpacity(level: Int): Float {
-    val safeLevel = level.coerceIn(SUBTITLE_OUTLINE_BLUR_MIN, SUBTITLE_OUTLINE_BLUR_MAX)
-    return 1f / (1f + safeLevel * 0.4f)
-}
+internal const val SUBTITLE_OUTLINE_BLUR_HALO_ALPHA = 0.55f
+internal const val SUBTITLE_OUTLINE_BLUR_CORE_ALPHA = 0.78f
+internal const val SUBTITLE_OUTLINE_BLUR_CORE_WIDTH_FACTOR = 0.8f
 
 internal fun subtitleOutlineBlurSigmaXPx(level: Int, videoWidthPx: Float): Float {
     val safeVideoWidth = videoWidthPx.takeIf { it.isFinite() && it > 0f }
@@ -104,7 +98,10 @@ internal fun decodeSubtitleAppearance(value: String?): SubtitleAppearance =
 internal fun SubtitleAppearance.encode(): String = subtitleAppearanceJson.encodeToString(normalized())
 
 internal val SubtitleStyleState.requiresComposeStyledOverlay: Boolean
-    get() = appearance.fontId != "default" || backgroundColor.alpha > 0f || appearance.shadowEnabled
+    get() = appearance.fontId != "default" ||
+        backgroundColor.alpha > 0f ||
+        appearance.shadowEnabled ||
+        (outlineEnabled && outlineWidth > 0 && appearance.outlineBlur > SUBTITLE_OUTLINE_BLUR_MIN)
 
 internal val SubtitleStyleState.usesStyledOverlay: Boolean
     get() = requiresComposeStyledOverlay ||
