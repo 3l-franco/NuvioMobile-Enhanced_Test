@@ -3149,8 +3149,11 @@ private fun SubtitleStyleState.toMpvSubtitleBackColor(): String =
         else -> backgroundColor.toMpvColor()
     }
 
-private fun SubtitleStyleState.toMpvSubtitleShadowOffset(): Double =
-    if (drawsSubtitleShadow) 1.5 else 0.0
+private fun SubtitleStyleState.toMpvSubtitleShadowOffset(): Double = when {
+    backgroundColor.alphaByte() > 0 -> 5.0
+    drawsSubtitleShadow -> 1.5
+    else -> 0.0
+}
 
 private const val MPV_SUBTITLE_FONT_SIZE_SCALE = 55.0 / 18.0
 private const val MPV_SUBTITLE_FONT_SIZE_MIN = 36

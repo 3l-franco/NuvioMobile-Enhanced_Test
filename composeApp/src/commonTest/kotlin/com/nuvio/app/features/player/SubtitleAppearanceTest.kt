@@ -1,6 +1,7 @@
 package com.nuvio.app.features.player
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
